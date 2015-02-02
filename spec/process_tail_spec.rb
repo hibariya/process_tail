@@ -15,10 +15,10 @@ describe ProcessTail do
     }
   end
 
-  def expect_same_output_and_no_error(fd, string)
-    greeting = process_maker { puts string }
+  def expect_same_output_and_no_error(fd, method, string)
+    greeting = process_maker { send(method, string) }
     pid      = greeting.call
-    io, th   = ProcessTail.trace(pid, :stdout)
+    io, th   = ProcessTail.trace(pid, fd)
 
     Process.kill :USR1, pid # resume child
 
@@ -33,9 +33,9 @@ describe ProcessTail do
 
   describe '.trace' do
     it do
-      expect_same_output_and_no_error :stdout, 'HELLO'
-      expect_same_output_and_no_error :stderr, 'HELLO'
-      expect_same_output_and_no_error :stdout, "HELLO\nLOVE AND KISSES"
+      expect_same_output_and_no_error :stdout, :puts, 'HELLO'
+      expect_same_output_and_no_error :stderr, :warn, 'HELLO'
+      expect_same_output_and_no_error :stdout, :puts, "HELLO\nLOVE AND KISSES"
     end
   end
 end
