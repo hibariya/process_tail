@@ -1,3 +1,5 @@
+require 'process_tail'
+
 describe ProcessTail do
   def process_maker(&fn)
      -> {
