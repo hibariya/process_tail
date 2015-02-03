@@ -11,6 +11,7 @@ So you can get other process outputs.
 
 * Mac OSX and Windows are not supported at the moment
 * SEGV occures occasionally
+* Multithreaded process support
 
 ## Installation
 
