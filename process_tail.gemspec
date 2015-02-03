@@ -8,8 +8,7 @@ Gem::Specification.new do |spec|
   spec.version       = ProcessTail::VERSION
   spec.authors       = ['Hika Hibariya']
   spec.email         = ['hibariya@gmail.com']
-  spec.summary       = %q{Trace output of other processes}
-  spec.description   = %q{Trace output of other processes}
+  spec.summary       = %q{Get other process outputs.}
   spec.homepage      = 'https://github.com/hibariya/process_tail'
   spec.license       = 'MIT'
 

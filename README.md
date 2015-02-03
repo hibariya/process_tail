@@ -1,6 +1,16 @@
 # ProcessTail
 
-Get other process outputs.
+https://github.com/hibariya/process_tail
+
+## Description
+
+ProcessTail traces other process' write(2) system call and copy its buffer.
+So you can get other process outputs.
+
+## Problems
+
+* Mac OSX and Windows are not supported at the moment
+* SEGV occures occasionally
 
 ## Installation
 
@@ -21,9 +31,9 @@ Or install it yourself as:
 ## Usage
 
 ```ruby
-io, th = ProcessTail.trace(pid, :stdout)
-
-puts "Output of #{pid}: #{io.gets}"
+ProcessTail.open pid, :stdout do |io|
+  puts "Recent stdout of #{pid}: #{io.gets}"
+end
 ```
 
 ## Contributing
