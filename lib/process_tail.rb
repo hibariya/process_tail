@@ -4,6 +4,19 @@ require 'process_tail/version'
 module ProcessTail
   module_function
 
+  def open(pid, fd = :stdout)
+    read_io, thread = trace(pid, fd)
+
+    block_given? ? yield(read_io) : read_io
+  ensure
+    finalize = -> {
+      read_io.close unless read_io.closed?
+      thread.kill
+    }
+
+    block_given? ? finalize.call : at_exit(&finalize)
+  end
+
   def trace(pid, fd = :stdout)
     read_io, write_io = IO.pipe
 
@@ -11,9 +24,11 @@ module ProcessTail
       begin
         do_trace pid, extract_fd(fd), write_io
       ensure
-        [read_io, write_io].each do |io|
-          io.close unless io.closed?
-        end
+        begin
+          [read_io, write_io].each do |io|
+            io.close unless io.closed?
+          end
+        rescue IOError; end
       end
     }
 

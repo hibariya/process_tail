@@ -7,7 +7,7 @@ describe ProcessTail do
         trap :USR1 do
           sleep 0.1 # XXX :(
 
-          fn.call
+          fn.call if fn
         end
 
         sleep
@@ -29,6 +29,31 @@ describe ProcessTail do
     Process.kill :TERM, pid
 
     expect { th.join }.to_not raise_error
+  end
+
+  describe '.open' do
+    specify 'without block' do
+      pid = process_maker.call
+
+      read_io = ProcessTail.open(pid, :stdout)
+
+      expect(read_io).to_not be_closed
+
+      read_io.close
+    end
+
+    specify 'with block' do
+      pid     = process_maker.call
+      read_io = nil
+
+      ProcessTail.open pid, :stdout  do |io|
+        read_io = io
+
+        expect(read_io).to_not be_closed
+      end
+
+      expect(read_io).to be_closed
+    end
   end
 
   describe '.trace' do
