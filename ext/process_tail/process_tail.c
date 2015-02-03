@@ -86,7 +86,7 @@ process_tail_loop(VALUE argp)
     signal = 0;
 
     if (WIFEXITED(status)) {
-      break;
+      return Qnil;
     }
 
     if (!WIFSTOPPED(status)) {
@@ -106,7 +106,11 @@ process_tail_loop(VALUE argp)
           string = malloc(regs.rdx);
           process_tail_get_data(args->pid, regs.rsi, string, regs.rdx);
 
-          rb_funcall(args->io, rb_intern("write"), 1, rb_str_new_cstr(string));
+          if (rb_funcall(args->io, rb_intern("closed?"), 0) == Qtrue) {
+            return Qnil;
+          }
+
+          rb_io_write(args->io, rb_str_new_cstr(string));
 
           free(string);
         }
