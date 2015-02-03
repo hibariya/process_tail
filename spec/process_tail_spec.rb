@@ -40,6 +40,7 @@ describe ProcessTail do
       expect(read_io).to_not be_closed
 
       read_io.close
+      Process.kill :TERM, pid
     end
 
     specify 'with block' do
@@ -53,6 +54,8 @@ describe ProcessTail do
       end
 
       expect(read_io).to be_closed
+
+      Process.kill :TERM, pid
     end
   end
 
