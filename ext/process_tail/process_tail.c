@@ -153,5 +153,5 @@ Init_process_tail()
   VALUE ProcessTail;
 
   ProcessTail = rb_define_module("ProcessTail");
-  rb_define_module_function(ProcessTail, "do_trace", process_tail_trace, 3);
+  rb_define_singleton_method(ProcessTail, "do_trace", process_tail_trace, 3);
 }
