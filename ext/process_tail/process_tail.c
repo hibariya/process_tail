@@ -103,7 +103,7 @@ process_tail_loop(VALUE argp)
 
         in_syscall = 1 - in_syscall;
         if (in_syscall && (args->fd == 0 || regs.rdi == args->fd)) {
-          string = malloc(regs.rdx);
+          string = malloc(regs.rdx + sizeof(long));
           process_tail_get_data(args->pid, regs.rsi, string, regs.rdx);
 
           if (rb_funcall(args->io, rb_intern("closed?"), 0) == Qtrue) {
