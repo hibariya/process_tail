@@ -60,9 +60,15 @@ describe ProcessTail do
   end
 
   describe '.trace' do
-    it do
+    specify 'simple stdout'  do
       expect_same_output_and_no_error :stdout, :puts, 'HELLO'
+    end
+
+    it 'simple stderr' do
       expect_same_output_and_no_error :stderr, :warn, 'HELLO'
+    end
+
+    it 'multiline' do
       expect_same_output_and_no_error :stdout, :puts, "HELLO\nLOVE AND KISSES"
     end
   end

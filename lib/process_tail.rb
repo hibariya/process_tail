@@ -21,13 +21,15 @@ module ProcessTail
 
       thread = Thread.fork {
         begin
-          do_trace pid, extract_fd(fd), write_io
+          ptrace_attach pid
+
+          do_trace pid, extract_fd(fd), write_io, read_io
         ensure
-          begin
-            [read_io, write_io].each do |io|
-              io.close unless io.closed?
-            end
-          rescue IOError; end
+          [read_io, write_io].each do |io|
+            io.close unless io.closed?
+          end
+
+          ptrace_detach pid
         end
       }
 
