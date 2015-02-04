@@ -1,39 +1,58 @@
+require 'thread'
 require 'process_tail/process_tail'
 require 'process_tail/version'
 
 module ProcessTail
   class << self
     def open(pid, fd = :stdout)
-      read_io, thread = trace(pid, fd)
+      io = trace(pid, fd)
 
-      block_given? ? yield(read_io) : read_io
+      block_given? ? yield(io) : io
     ensure
-      finalize = -> {
-        read_io.close unless read_io.closed?
-        thread.kill
-      }
-
-      block_given? ? finalize.call : at_exit(&finalize)
+      io.close if block_given? && !io.closed?
     end
 
     def trace(pid, fd = :stdout)
       read_io, write_io = IO.pipe
+      task_ids   = extract_task_ids(pid)
+      wait_queue = Queue.new
 
       thread = Thread.fork {
         begin
-          ptrace_attach pid
-
-          do_trace pid, extract_fd(fd), write_io, read_io
-        ensure
-          [read_io, write_io].each do |io|
-            io.close unless io.closed?
+          extract_task_ids(pid).each do |tid|
+            attach tid
           end
 
-          ptrace_detach pid
+          do_trace extract_fd(fd), write_io, read_io, wait_queue
+        ensure
+          write_io.close unless write_io.closed?
+
+          task_ids.each do |tid|
+            detach tid
+          end
         end
       }
 
-      [read_io, thread]
+      at_exit do
+        thread.kill
+        thread.join
+      end
+
+      wait_all_attach task_ids, wait_queue
+
+      read_io
+    end
+
+    def wait_all_attach(task_ids, waitq)
+      task_ids.size.times do
+        waitq.deq
+      end
+    end
+
+    def extract_task_ids(pid)
+      Dir.open("/proc/#{pid}/task") {|dir|
+        dir.entries.grep(/^\d+$/).map(&:to_i)
+      }
     end
 
     def extract_fd(name)

@@ -10,101 +10,208 @@
 #include <ruby.h>
 #include <ruby/thread.h>
 
-struct
-process_tail_waitpid_args {
+typedef struct pt_tracee {
   pid_t pid;
+  int activated;
+  int dead;
+  struct pt_tracee *next;
+} pt_tracee_t;
+
+typedef struct pt_wait_args {
   int *status;
-};
+  pid_t pid;
+} pt_wait_args_t;
+
+static pt_tracee_t *
+pt_tracee_add(pt_tracee_t **headpp, pid_t pid)
+{
+  pt_tracee_t *tracee = malloc(sizeof(pt_tracee_t));
+
+  tracee->pid       = pid;
+  tracee->activated = 0;
+  tracee->dead      = 0;
+  tracee->next      = (struct pt_tracee *)*headpp;
+
+  (*headpp) = tracee;
+
+  return tracee;
+}
+
+static pt_tracee_t *
+pt_tracee_find_or_add(pt_tracee_t **headpp, pid_t pid)
+{
+  pt_tracee_t *tracee = *headpp;
+
+  while (tracee != NULL) {
+    if (tracee->pid == pid) {
+      return tracee;
+    }
+
+    tracee = tracee->next;
+  }
+
+  return pt_tracee_add(headpp, pid);
+}
+
+static int
+pt_tracee_wipedoutp(pt_tracee_t *headp)
+{
+  pt_tracee_t *tracee = headp;
+
+  while (tracee != NULL) {
+    if (tracee->dead == 0) {
+      return 0;
+    }
+
+    tracee = tracee->next;
+  }
+
+  return 1;
+}
+
+static void
+pt_tracee_free(pt_tracee_t **headpp)
+{
+  pt_tracee_t *tracee  = *headpp;
+
+  if (tracee->next) {
+    pt_tracee_free(&tracee->next);
+  }
+
+  free(tracee);
+  (*headpp) = NULL;
+}
+
+static int
+pt_io_closedp(VALUE io)
+{
+  return rb_funcall(io, rb_intern("closed?"), 0) == Qtrue;
+}
 
 static void *
-process_tail_waitpid(void *argp)
+pt_wait(void *argp)
 {
-  struct process_tail_waitpid_args *args = argp;
+  pt_wait_args_t *args = (pt_wait_args_t *)argp;
 
-  waitpid(args->pid, args->status, WUNTRACED | WCONTINUED);
+  args->pid = waitpid(-1, args->status, __WALL);
 
   return NULL;
 }
 
 static void
-process_tail_get_data(pid_t pid, long addr, char *string, int len)
+pt_get_data(pid_t pid, long addr, char *string, int length)
 {
-  long data;
   int  i;
+  long data;
 
-  for (i = 0; i < len; i += sizeof(long)) {
+  for (i = 0; i < length; i += sizeof(long)) {
     data = ptrace(PTRACE_PEEKDATA, pid, addr + i);
 
     memcpy(string + i, &data, sizeof(long));
   }
 
-  string[len] = '\0';
+  string[length] = '\0';
 }
 
 static void
-process_tail_loop(pid_t pid, unsigned int fd, VALUE write_io, VALUE read_io)
+pt_ptrace_syscall(pid_t pid, long signal)
 {
-  int in_syscall = 0;
-  int signal     = 0;
+  ptrace(PTRACE_SYSCALL, pid, 0, signal);
+
+  rb_thread_schedule();
+}
+
+static void
+pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tracee_t *tracee_headp)
+{
+  char *string = NULL;
+  int syscall  = 0;
   int status;
-  char *string   = NULL;
-  struct process_tail_waitpid_args wait_args = {pid, &status};
+  long signal;
+  pid_t pid;
+  pt_tracee_t *tracee;
+  pt_wait_args_t pt_wait_args = {&status};
+
+  // NOTE: system call: eax, arguments: rdi, rsi, rdx, r10, r8, r9
   struct user_regs_struct regs;
 
-  while (ptrace(PTRACE_SYSCALL, pid, NULL, signal) == 0) {
-    rb_thread_call_without_gvl(process_tail_waitpid, &wait_args, RUBY_UBF_PROCESS, NULL);
+  while (1) {
+    rb_thread_call_without_gvl(pt_wait, &pt_wait_args, RUBY_UBF_PROCESS, NULL);
 
     signal = 0;
+    pid    = pt_wait_args.pid;
+    tracee = pt_tracee_find_or_add(&tracee_headp, pid);
 
-    if (WIFEXITED(status)) {
+    if (pt_io_closedp(read_io)) {
+      pt_tracee_free(&tracee_headp);
+
       return;
     }
 
-    if (!WIFSTOPPED(status)) {
+    if (tracee->activated == 0) {
+      ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD);
+      tracee->activated = 1;
+
+      rb_funcall(wait_queue, rb_intern("enq"), 1, INT2FIX((int)pid));
+      pt_ptrace_syscall(pid, signal);
+
       continue;
     }
 
-    switch (WSTOPSIG(status)) {
-      case SIGTRAP:
-        ptrace(PTRACE_GETREGS, pid, 0, &regs);
+    if (WIFEXITED(status) || WIFSIGNALED(status)) {
+      tracee->dead = 1;
 
-        if (regs.orig_rax != SYS_write) {
-          continue;
-        }
+      if (pt_tracee_wipedoutp(tracee_headp)) {
+        pt_tracee_free(&tracee_headp);
 
-        in_syscall = 1 - in_syscall;
-        if (in_syscall && (fd == 0 || regs.rdi == fd)) {
-          string = malloc(regs.rdx + sizeof(long));
-          process_tail_get_data(pid, regs.rsi, string, regs.rdx);
+        return;
+      }
 
-          if (rb_funcall(read_io, rb_intern("closed?"), 0) == Qtrue) {
-            return;
-          }
-
-          rb_io_write(write_io, rb_str_new_cstr(string));
-
-          free(string);
-        }
-      case SIGVTALRM:
-        break;
-      case SIGSTOP:
-        break;
-      default:
-        signal = WSTOPSIG(status);
+      continue;
     }
 
-    rb_thread_schedule();
+    if (!(WIFSTOPPED(status) && WSTOPSIG(status) & 0x80)) {
+      signal = WSTOPSIG(status);
+      pt_ptrace_syscall(pid, signal);
+
+      continue;
+    }
+
+    ptrace(PTRACE_GETREGS, pid, 0, &regs);
+
+    if (regs.orig_rax != SYS_write) {
+      pt_ptrace_syscall(pid, signal);
+
+      continue;
+    }
+
+    syscall = 1 - syscall;
+    if (syscall && (fd == 0 || regs.rdi == fd)) {
+      string = malloc(regs.rdx + sizeof(long));
+      pt_get_data(pid, regs.rsi, string, regs.rdx);
+
+      if (pt_io_closedp(read_io)) {
+        free(string);
+        pt_tracee_free(&tracee_headp);
+
+        return;
+      }
+
+      rb_io_write(write_io, rb_str_new_cstr(string));
+
+      free(string);
+    }
+
+    pt_ptrace_syscall(pid, signal);
   }
 }
 
 static VALUE
-process_tail_attach(VALUE klass, VALUE pidp)
+pt_attach(VALUE klass, VALUE pidv)
 {
-  int status;
-  int pid = (pid_t)FIX2INT(pidp);
-  struct process_tail_waitpid_args wait_args = {pid, &status};
+  int pid = (pid_t)FIX2INT(pidv);
 
-  Check_Type(pidp, T_FIXNUM);
+  Check_Type(pidv, T_FIXNUM);
 
   if (ptrace(PTRACE_ATTACH, pid, NULL, NULL) < 0) {
     rb_sys_fail("PTRACE_ATTACH");
@@ -112,30 +219,29 @@ process_tail_attach(VALUE klass, VALUE pidp)
     return Qnil;
   }
 
-  rb_thread_call_without_gvl(process_tail_waitpid, &wait_args, RUBY_UBF_PROCESS, NULL);
-
   return Qtrue;
 }
 
 static VALUE
-process_tail_detach(VALUE klass, VALUE pidp)
+pt_detach(VALUE klass, VALUE pidv)
 {
-  Check_Type(pidp, T_FIXNUM);
+  Check_Type(pidv, T_FIXNUM);
 
-  ptrace(PTRACE_DETACH, (pid_t)FIX2INT(pidp), NULL, NULL);
+  ptrace(PTRACE_DETACH, (pid_t)FIX2INT(pidv), NULL, NULL);
 
   return Qnil;
 }
 
 static VALUE
-process_tail_trace(VALUE klass, VALUE pidp, VALUE fdp, VALUE write_io, VALUE read_io)
+pt_trace(VALUE klass, VALUE fdp, VALUE write_io, VALUE read_io, VALUE wait_queue)
 {
-  Check_Type(pidp,     T_FIXNUM);
-  Check_Type(fdp,      T_FIXNUM);
-  Check_Type(write_io, T_FILE);
-  Check_Type(read_io,  T_FILE);
+  pt_tracee_t *tracee_headp = NULL;
 
-  process_tail_loop((pid_t)FIX2INT(pidp), (unsigned int)FIX2INT(fdp), write_io, read_io);
+  Check_Type(fdp,         T_FIXNUM);
+  Check_Type(write_io,    T_FILE);
+  Check_Type(read_io,     T_FILE);
+
+  pt_loop((unsigned int)FIX2INT(fdp), write_io, read_io, wait_queue, tracee_headp);
 
   return Qnil;
 }
@@ -145,7 +251,7 @@ Init_process_tail()
 {
   VALUE ProcessTail = rb_define_module("ProcessTail");
 
-  rb_define_singleton_method(ProcessTail, "ptrace_attach", process_tail_attach, 1);
-  rb_define_singleton_method(ProcessTail, "do_trace",      process_tail_trace,  4);
-  rb_define_singleton_method(ProcessTail, "ptrace_detach", process_tail_detach, 1);
+  rb_define_singleton_method(ProcessTail, "attach",   pt_attach, 1);
+  rb_define_singleton_method(ProcessTail, "do_trace", pt_trace,  4);
+  rb_define_singleton_method(ProcessTail, "detach",   pt_detach, 1);
 }
