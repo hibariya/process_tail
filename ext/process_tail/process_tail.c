@@ -27,6 +27,10 @@ pt_tracee_add(pt_tracee_t **headpp, pid_t pid)
 {
   pt_tracee_t *tracee = malloc(sizeof(pt_tracee_t));
 
+  if (tracee == NULL) {
+    exit(EXIT_FAILURE);
+  }
+
   tracee->pid       = pid;
   tracee->activated = 0;
   tracee->dead      = 0;
@@ -188,6 +192,11 @@ pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tra
     syscall = 1 - syscall;
     if (syscall && (fd == 0 || regs.rdi == fd)) {
       string = malloc(regs.rdx + sizeof(long));
+
+      if (string == NULL) {
+        exit(EXIT_FAILURE);
+      }
+
       pt_get_data(pid, regs.rsi, string, regs.rdx);
 
       if (pt_io_closedp(read_io)) {
