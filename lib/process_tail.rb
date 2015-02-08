@@ -27,7 +27,7 @@ module ProcessTail
       task_ids   = extract_task_ids(pid)
       wait_queue = Queue.new
 
-      thread = Thread.fork {
+      Thread.fork do
         begin
           extract_task_ids(pid).each do |tid|
             attach tid
@@ -41,11 +41,6 @@ module ProcessTail
             detach tid
           end
         end
-      }
-
-      at_exit do
-        thread.kill
-        thread.join
       end
 
       wait_all_attach task_ids, wait_queue
