@@ -1,4 +1,4 @@
-# ProcessTail
+# ProcessTail [![Build Status](https://travis-ci.org/hibariya/process_tail.svg?branch=master)](https://travis-ci.org/hibariya/process_tail)
 
 https://github.com/hibariya/process_tail
 
