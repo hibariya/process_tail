@@ -3,6 +3,8 @@ require 'process_tail/process_tail'
 require 'process_tail/version'
 
 module ProcessTail
+  TRACE_LOCK = Mutex.new # NOTE For now, ProcessTail can't trace multiple processes at the same time
+
   class << self
     def open(pid, fd = :stdout)
       io = trace(pid, fd)
@@ -13,6 +15,14 @@ module ProcessTail
     end
 
     def trace(pid, fd = :stdout)
+      TRACE_LOCK.synchronize {
+        trace_without_lock(pid, fd)
+      }
+    end
+
+    private
+
+    def trace_without_lock(pid, fd)
       read_io, write_io = IO.pipe
       task_ids   = extract_task_ids(pid)
       wait_queue = Queue.new
