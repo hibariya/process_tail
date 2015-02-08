@@ -58,7 +58,7 @@ pt_tracee_find_or_add(pt_tracee_t **headpp, pid_t pid)
 }
 
 static int
-pt_tracee_wipedoutp(pt_tracee_t *headp)
+pt_tracee_wipedoutq(pt_tracee_t *headp)
 {
   pt_tracee_t *tracee = headp;
 
@@ -87,7 +87,7 @@ pt_tracee_free(pt_tracee_t **headpp)
 }
 
 static int
-pt_io_closedp(VALUE io)
+pt_io_closedq(VALUE io)
 {
   return rb_funcall(io, rb_intern("closed?"), 0) == Qtrue;
 }
@@ -146,7 +146,7 @@ pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tra
     pid    = pt_wait_args.pid;
     tracee = pt_tracee_find_or_add(&tracee_headp, pid);
 
-    if (pt_io_closedp(read_io)) {
+    if (pt_io_closedq(read_io)) {
       pt_tracee_free(&tracee_headp);
 
       return;
@@ -165,7 +165,7 @@ pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tra
     if (WIFEXITED(status) || WIFSIGNALED(status)) {
       tracee->dead = 1;
 
-      if (pt_tracee_wipedoutp(tracee_headp)) {
+      if (pt_tracee_wipedoutq(tracee_headp)) {
         pt_tracee_free(&tracee_headp);
 
         return;
@@ -199,7 +199,7 @@ pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tra
 
       pt_get_data(pid, regs.rsi, string, regs.rdx);
 
-      if (pt_io_closedp(read_io)) {
+      if (pt_io_closedq(read_io)) {
         free(string);
         pt_tracee_free(&tracee_headp);
 
