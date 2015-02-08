@@ -151,7 +151,7 @@ pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tra
     }
 
     if (tracee->activated == 0) {
-      ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD);
+      ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE);
       tracee->activated = 1;
 
       rb_funcall(wait_queue, rb_intern("enq"), 1, INT2FIX((int)pid));

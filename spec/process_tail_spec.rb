@@ -99,6 +99,7 @@ describe ProcessTail do
         sleep
       }
 
+      sleep 1
       $recorded_children << pid
       io = ProcessTail.trace(pid, :stdout)
 
