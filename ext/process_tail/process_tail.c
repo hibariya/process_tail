@@ -74,14 +74,14 @@ pt_tracee_wipedoutq(pt_tracee_t *headp)
 static void
 pt_tracee_free(pt_tracee_t **headpp)
 {
-  pt_tracee_t *tracee  = *headpp;
+  pt_tracee_t *tracee = *headpp;
 
   if (tracee->next) {
     pt_tracee_free(&tracee->next);
   }
 
   free(tracee);
-  (*headpp) = NULL;
+  tracee = NULL;
 }
 
 static int
