@@ -7,45 +7,69 @@ module ProcessTail
 
   class << self
     def open(pid, fd = :stdout)
-      io = trace(pid, fd)
+      read_io, write_io = IO.pipe
+      trace_thread      = trace(pid, fd) {|str, *|
+        unless read_io.closed?
+          write_io.write str
+        else
+          trace_thread.kill
+        end
+      }
 
-      block_given? ? yield(io) : io
-    ensure
-      io.close if block_given? && !io.closed?
+      wait_thread = fork_wait_thread(trace_thread, [read_io, write_io])
+
+      if block_given?
+        value = yield(read_io)
+
+        trace_thread.kill
+        wait_thread.join
+
+        value
+      else
+        read_io
+      end
     end
 
-    def trace(pid, fd = :stdout)
+    def trace(pid, fd = :stdout, &block)
       TRACE_LOCK.synchronize {
-        trace_without_lock(pid, fd)
+        trace_without_lock(pid, fd, &block)
       }
     end
 
     private
 
-    def trace_without_lock(pid, fd)
-      read_io, write_io = IO.pipe
-      task_ids   = extract_task_ids(pid)
-      wait_queue = Queue.new
-
-      Thread.fork do
+    def trace_without_lock(pid, fd, &block)
+      task_ids     = extract_task_ids(pid)
+      wait_queue   = Queue.new
+      trace_thread = Thread.fork {
         begin
-          extract_task_ids(pid).each do |tid|
+          task_ids.each do |tid|
             attach tid
           end
 
-          do_trace extract_fd(fd), write_io, read_io, wait_queue
+          do_trace extract_fd(fd), wait_queue, &block
         ensure
-          write_io.close unless write_io.closed?
-
           task_ids.each do |tid|
             detach tid
           end
         end
-      end
+      }
 
       wait_all_attach task_ids, wait_queue
 
-      read_io
+      trace_thread
+    end
+
+    def fork_wait_thread(trace_thread, pipe)
+      Thread.fork {
+        begin
+          trace_thread.join
+        ensure
+          pipe.each do |io|
+            io.close unless io.closed?
+          end
+        end
+      }
     end
 
     def wait_all_attach(task_ids, waitq)

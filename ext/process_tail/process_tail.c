@@ -84,12 +84,6 @@ pt_tracee_free(pt_tracee_t **headpp)
   tracee = NULL;
 }
 
-static int
-pt_io_closedq(VALUE io)
-{
-  return rb_funcall(io, rb_intern("closed?"), 0) == Qtrue;
-}
-
 static void *
 pt_wait(void *argp)
 {
@@ -124,7 +118,7 @@ pt_ptrace_syscall(pid_t pid, long signal)
 }
 
 static void
-pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tracee_t *tracee_headp)
+pt_loop(unsigned int fd, VALUE wait_queue, pt_tracee_t *tracee_headp)
 {
   char *string = NULL;
   int syscall  = 0;
@@ -143,12 +137,6 @@ pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tra
     signal = 0;
     pid    = pt_wait_args.pid;
     tracee = pt_tracee_find_or_add(&tracee_headp, pid);
-
-    if (pt_io_closedq(read_io)) {
-      pt_tracee_free(&tracee_headp);
-
-      return;
-    }
 
     if (tracee->activated == 0) {
       ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE);
@@ -197,14 +185,7 @@ pt_loop(unsigned int fd, VALUE write_io, VALUE read_io, VALUE wait_queue, pt_tra
 
       pt_get_data(pid, regs.rsi, string, regs.rdx);
 
-      if (pt_io_closedq(read_io)) {
-        free(string);
-        pt_tracee_free(&tracee_headp);
-
-        return;
-      }
-
-      rb_io_write(write_io, rb_str_new_cstr(string));
+      rb_yield(rb_ary_new_from_args(3, rb_str_new_cstr(string), INT2FIX((int)pid), INT2FIX(fd)));
 
       free(string);
     }
@@ -240,16 +221,15 @@ pt_detach(VALUE klass, VALUE pidv)
 }
 
 static VALUE
-pt_trace(VALUE klass, VALUE fdp, VALUE write_io, VALUE read_io, VALUE wait_queue)
+pt_trace(VALUE klass, VALUE fdp, VALUE wait_queue)
 {
   pt_tracee_t *tracee_headp = NULL;
 
-  Check_Type(fdp,         T_FIXNUM);
-  Check_Type(write_io,    T_FILE);
-  Check_Type(read_io,     T_FILE);
+  Check_Type(fdp, T_FIXNUM);
 
-  pt_loop((unsigned int)FIX2INT(fdp), write_io, read_io, wait_queue, tracee_headp);
+  pt_loop((unsigned int)FIX2INT(fdp), wait_queue, tracee_headp);
 
+  // TODO ensure pt_detach and free
   return Qnil;
 }
 
@@ -259,6 +239,6 @@ Init_process_tail()
   VALUE ProcessTail = rb_define_module("ProcessTail");
 
   rb_define_singleton_method(ProcessTail, "attach",   pt_attach, 1);
-  rb_define_singleton_method(ProcessTail, "do_trace", pt_trace,  4);
+  rb_define_singleton_method(ProcessTail, "do_trace", pt_trace,  2);
   rb_define_singleton_method(ProcessTail, "detach",   pt_detach, 1);
 }

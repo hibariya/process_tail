@@ -5,7 +5,11 @@ require 'process_tail'
 $stdout.sync = true
 
 ProcessTail.open Integer(ARGV[0]) do |io|
-  while c = io.getc
-    print c
+  begin
+    while c = io.getc
+      print c
+    end
+  rescue IOError
+    # NOP
   end
 end

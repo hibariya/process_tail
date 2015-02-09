@@ -21,15 +21,14 @@ describe ProcessTail do
   def expect_same_output_and_no_error(fd, method, string)
     greeting    = process_maker { send(method, string) }
     pid         = greeting.call
-    io          = ProcessTail.trace(pid, fd)
 
-    Process.kill :USR1, pid # resume child
+    ProcessTail.open pid, fd do |io|
+      Process.kill :USR1, pid # resume child
 
-    "#{string}\n".each_line do |expected|
-      expect(io.gets).to eq expected
+      "#{string}\n".each_line do |expected|
+        expect(io.gets).to eq expected
+      end
     end
-
-    io.close
   end
 
   around do |example|
@@ -40,11 +39,12 @@ describe ProcessTail do
       timeout 5 do
         example.run
       end
-
     ensure
       $recorded_children.each do |child|
         Process.kill :TERM, child
       end
+
+      sleep 1 # FIXME :(
     end
   end
 
@@ -71,15 +71,17 @@ describe ProcessTail do
 
       expect(read_io).to be_closed
     end
-  end
 
-  describe '.trace' do
     specify 'simple stdout'  do
       expect_same_output_and_no_error :stdout, :puts, 'HELLO'
     end
 
     specify 'simple stderr' do
       expect_same_output_and_no_error :stderr, :warn, 'HELLO'
+    end
+
+    specify 'multiline' do
+      expect_same_output_and_no_error :stdout, :puts, "HELLO\nHELLO"
     end
 
     specify 'multithreaded' do
@@ -90,7 +92,7 @@ describe ProcessTail do
 
         Thread.fork do
           trap :USR2 do
-            puts 'HELLO'
+            puts 'LOVE AND KISSES'
           end
 
           sleep
@@ -99,21 +101,16 @@ describe ProcessTail do
         sleep
       }
 
-      sleep 1
       $recorded_children << pid
-      io = ProcessTail.trace(pid, :stdout)
+      io = ProcessTail.open(pid, :stdout)
 
       Process.kill :USR1, pid
       Process.kill :USR2, pid
 
       expect(io.gets).to eq "HELLO\n"
-      expect(io.gets).to eq "HELLO\n"
+      expect(io.gets).to eq "LOVE AND KISSES\n"
 
       io.close
-    end
-
-    specify 'multiline' do
-      expect_same_output_and_no_error :stdout, :puts, "HELLO\nLOVE AND KISSES"
     end
   end
 end
