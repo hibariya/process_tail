@@ -11,7 +11,6 @@ So you can get other process outputs.
 
 * Mac OSX and Windows are not supported at the moment
 * SEGV occures occasionally
-* Multithreaded process support
 
 ## Installation
 
@@ -31,10 +30,18 @@ Or install it yourself as:
 
 ## Usage
 
+### Get outputs as an IO object
+
 ```ruby
 ProcessTail.open pid, :stdout do |io|
   puts "Recent stdout of #{pid}: #{io.gets}"
 end
+```
+
+### Show outputs instantly
+
+```bash
+$ process_tail $(pgrep PROCESS_NAME)
 ```
 
 ## Contributing
