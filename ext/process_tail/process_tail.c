@@ -59,7 +59,7 @@ pt_tracee_find_or_add(pt_tracee_t **headpp, pid_t pid)
   pt_tracee_t *headp   = *headpp;
   pt_tracee_t *current = headp;
 
-  while (current->next) {
+  while (current) {
     if (current->pid == pid) {
       return current;
     }
@@ -75,7 +75,7 @@ pt_tracee_wipedoutq(pt_tracee_t *headp)
 {
   pt_tracee_t *current = headp;
 
-  while (current->next) {
+  while (current) {
     if (current->dead == 0) {
       return 0;
     }
@@ -91,12 +91,12 @@ pt_tracee_free(pt_tracee_t **headpp)
 {
   pt_tracee_t *tracee = *headpp;
 
-  if (tracee->next) {
+  if (tracee) {
     pt_tracee_free(&tracee->next);
-  }
 
-  free(tracee);
-  tracee = NULL;
+    free(tracee);
+    tracee = NULL;
+  }
 }
 
 static void *
@@ -242,7 +242,7 @@ pt_finalize(VALUE traceev)
 {
   pt_tracee_t *tracee = (void *)traceev;
 
-  if (tracee->next) {
+  if (tracee) {
     pt_tracee_free(&tracee);
   }
 
@@ -252,14 +252,12 @@ pt_finalize(VALUE traceev)
 static VALUE
 pt_trace(VALUE klass, VALUE fdv, VALUE wait_queue)
 {
-  pt_tracee_t  tracee;
-  pt_loop_args_t loop_args = {FIX2INT(fdv), &tracee, &wait_queue};
+  pt_tracee_t  *tracee = NULL;
+  pt_loop_args_t loop_args = {FIX2INT(fdv), tracee, &wait_queue};
 
   Check_Type(fdv, T_FIXNUM);
 
-  pt_tracee_initialize(&tracee);
-
-  rb_ensure(pt_loop, (VALUE)&loop_args, pt_finalize, (VALUE)&tracee);
+  rb_ensure(pt_loop, (VALUE)&loop_args, pt_finalize, (VALUE)tracee);
 
   return Qnil;
 }
