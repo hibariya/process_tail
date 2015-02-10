@@ -242,9 +242,7 @@ pt_finalize(VALUE traceev)
 {
   pt_tracee_t *tracee = (void *)traceev;
 
-  if (tracee) {
-    pt_tracee_free(&tracee);
-  }
+  pt_tracee_free(&tracee);
 
   return Qnil;
 }
