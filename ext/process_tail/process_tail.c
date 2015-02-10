@@ -267,8 +267,7 @@ Init_process_tail()
 {
   VALUE ProcessTail = rb_define_module("ProcessTail");
 
-  // TODO: private
-  rb_define_singleton_method(ProcessTail, "attach",   pt_attach, 1);
-  rb_define_singleton_method(ProcessTail, "do_trace", pt_trace,  2);
-  rb_define_singleton_method(ProcessTail, "detach",   pt_detach, 1);
+  rb_define_private_method(rb_singleton_class(ProcessTail), "attach",   pt_attach, 1);
+  rb_define_private_method(rb_singleton_class(ProcessTail), "do_trace", pt_trace,  2);
+  rb_define_private_method(rb_singleton_class(ProcessTail), "detach",   pt_detach, 1);
 }
