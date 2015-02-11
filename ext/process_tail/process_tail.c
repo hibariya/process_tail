@@ -140,18 +140,16 @@ pt_loop(VALUE loop_args)
   char *string = NULL;
   int syscall  = 0;
   int status;
-  long signal;
   pid_t pid;
   pt_tracee_t *tracee;
   pt_wait_args_t pt_wait_args = {&status};
 
-  // NOTE: system call: eax, arguments: rdi, rsi, rdx, r10, r8, r9
+  // NOTE: system call: orig_rax, arguments: rdi, rsi, rdx, r10, r8, r9
   struct user_regs_struct regs;
 
   while (1) {
     rb_thread_call_without_gvl(pt_wait, &pt_wait_args, RUBY_UBF_PROCESS, NULL);
 
-    signal = 0;
     pid    = pt_wait_args.pid;
     tracee = pt_tracee_find_or_add(&args->tracee, pid);
 
@@ -160,7 +158,7 @@ pt_loop(VALUE loop_args)
       rb_funcall(*args->wait_queue, rb_intern("enq"), 1, INT2FIX((int)pid));
 
       ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE);
-      pt_ptrace_syscall(pid, signal);
+      pt_ptrace_syscall(pid, 0);
 
       continue;
     }
@@ -176,8 +174,7 @@ pt_loop(VALUE loop_args)
     }
 
     if (!(WIFSTOPPED(status) && WSTOPSIG(status) & 0x80)) {
-      signal = WSTOPSIG(status);
-      pt_ptrace_syscall(pid, signal);
+      pt_ptrace_syscall(pid, WSTOPSIG(status));
 
       continue;
     }
@@ -185,7 +182,7 @@ pt_loop(VALUE loop_args)
     ptrace(PTRACE_GETREGS, pid, 0, &regs);
 
     if (regs.orig_rax != SYS_write) {
-      pt_ptrace_syscall(pid, signal);
+      pt_ptrace_syscall(pid, 0);
 
       continue;
     }
@@ -205,7 +202,7 @@ pt_loop(VALUE loop_args)
       free(string);
     }
 
-    pt_ptrace_syscall(pid, signal);
+    pt_ptrace_syscall(pid, 0);
   }
 
   return Qnil;
