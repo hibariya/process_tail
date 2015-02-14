@@ -4,7 +4,7 @@ require 'process_tail'
 
 $stdout.sync = true
 
-ProcessTail.open Integer(ARGV[0]) do |io|
+ProcessTail.open Integer(ARGV[0]), :all do |io|
   begin
     while c = io.getc
       print c
