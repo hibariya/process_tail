@@ -127,7 +127,7 @@ pt_read_data(pid_t pid, long addr, char *string, int length)
 static void
 pt_ptrace_syscall(pid_t pid, long signal)
 {
-  ptrace(PTRACE_SYSCALL, pid, 0, signal);
+  ptrace(PTRACE_SYSCALL, pid, 0, signal == SIGTRAP ? 0 : signal);
 
   rb_thread_schedule();
 }
