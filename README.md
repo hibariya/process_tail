@@ -9,7 +9,7 @@ So you can get other process outputs.
 
 ## Problems
 
-* Mac OSX and Windows are not supported at the moment
+* Windows is not supported at the moment
 * SEGV occures occasionally
 
 ## Installation

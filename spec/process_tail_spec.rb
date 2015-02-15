@@ -56,7 +56,7 @@ describe ProcessTail do
 
       expect(read_io).to_not be_closed
 
-      read_io.close
+      expect(read_io.close).to be_nil
     end
 
     specify 'with block' do

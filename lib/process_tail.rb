@@ -1,87 +1,85 @@
-require 'thread'
 require 'process_tail/process_tail'
 require 'process_tail/version'
+require 'erb'
+require 'thread'
 
 module ProcessTail
-  TRACE_LOCK = Mutex.new # NOTE For now, ProcessTail can't trace multiple processes at the same time
+  module ReadIOExtention
+    attr_accessor :process_tail_after_close
 
-  class << self
-    def open(pid, fd = :stdout)
-      read_io, write_io = IO.pipe
-      trace_thread      = trace(pid, fd) {|str, *|
-        unless read_io.closed?
-          write_io.write str
-        else
-          trace_thread.kill
-        end
-      }
-
-      wait_thread = fork_wait_thread(trace_thread, [read_io, write_io])
-
-      if block_given?
-        value = yield(read_io)
-
-        trace_thread.kill
-        wait_thread.join
-
-        value
-      else
-        read_io
+    def close
+      super
+    ensure
+      if hook = process_tail_after_close
+        hook.call
       end
     end
+  end
 
-    def trace(pid, fd = :stdout, &block)
-      TRACE_LOCK.synchronize {
-        trace_without_lock(pid, fd, &block)
-      }
+  class Tracer
+    def attach
+      case
+      when respond_to?(:ptrace_attach, true)
+        ptrace_attach
+      when respond_to?(:dtrace_attach, true)
+        dtrace_attach
+      else
+        raise NotImplementedError
+      end
+
+      self
+    end
+
+    def detach
+      trace_thread.kill.join
+
+      self
     end
 
     private
 
-    def trace_without_lock(pid, fd, &block)
-      task_ids     = extract_task_ids(pid)
-      wait_queue   = Queue.new
-      trace_thread = Thread.fork {
-        begin
-          task_ids.each do |tid|
-            attach tid
-          end
+    def generate_dscript
+      template = File.read(File.join(__dir__, 'process_tail/process_tail.d'))
 
-          do_trace extract_fd(fd), wait_queue, &block
-        ensure
-          task_ids.each do |tid|
-            detach tid
-          end
+      ERB.new(template).result(binding)
+    end
+  end
+
+  class << self
+    def open(pid, fd = :stdout)
+      read_io, write_io = IO.pipe
+
+      tracer = trace(pid, fd) {|tid, fd_num, str|
+        unless read_io.closed?
+          write_io.write str
+        else
+          write_io.close
+          process_tail.detach
         end
       }
 
-      wait_all_attach task_ids, wait_queue
-
-      trace_thread
-    end
-
-    def fork_wait_thread(trace_thread, pipe)
-      Thread.fork {
-        begin
-          trace_thread.join
-        ensure
-          pipe.each do |io|
-            io.close unless io.closed?
-          end
-        end
+      read_io.extend ReadIOExtention
+      read_io.process_tail_after_close = -> {
+        write_io.close unless write_io.closed?
+        tracer.detach
       }
-    end
 
-    def wait_all_attach(task_ids, waitq)
-      task_ids.size.times do
-        waitq.deq
+      block_given? ? yield(read_io) : read_io
+    ensure
+      if block_given?
+        [read_io, write_io].each do |io|
+          io.close unless io.closed?
+        end
       end
     end
 
-    def extract_task_ids(pid)
-      Dir.open("/proc/#{pid}/task") {|dir|
-        dir.entries.grep(/^\d+$/).map(&:to_i)
-      }
+    private
+
+    def trace(pid, fd, &block)
+      pt = Tracer.new(pid, extract_fd(fd), &block)
+      pt.attach
+
+      pt
     end
 
     def extract_fd(name)
