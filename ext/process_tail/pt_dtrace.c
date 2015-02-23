@@ -150,6 +150,7 @@ pt_finalize(VALUE self)
   dtrace_close(PT_DTRACE_HDL(pt));
 
   pt_unlock_trace();
+  rb_funcall(pt->parent_thread, rb_intern("raise"), 1, ProcessTail_StopTracing);
 
   return Qnil;
 }
@@ -179,10 +180,11 @@ pt_dtrace_attach(VALUE self)
     return Qnil;
   }
 
-  pt->tracee       = NULL; // NOT USED
-  pt->data         = (void *)hdl;
-  pt->wait_queue   = rb_class_new_instance(0, NULL, rb_path2class("Queue"));
-  pt->trace_thread = rb_thread_create(pt_loop_thread, (void *)self);
+  pt->tracee        = NULL; // NOT USED
+  pt->data          = (void *)hdl;
+  pt->wait_queue    = rb_class_new_instance(0, NULL, rb_path2class("Queue"));
+  pt->parent_thread = rb_thread_current();
+  pt->trace_thread  = rb_thread_create(pt_loop_thread, (void *)self);
 
   rb_funcall(pt->wait_queue, rb_intern("deq"), 0);
 

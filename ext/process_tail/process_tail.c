@@ -10,8 +10,6 @@
 #include "pt_dtrace.h"
 #endif
 
-#define PT_TRACE_LOCK (rb_const_get(ProcessTail_Tracer, rb_intern("TRACE_LOCK")))
-
 static void
 pt_process_tail_mark(pt_process_tail_t *ptp)
 {
@@ -42,12 +40,13 @@ pt_process_tail_initialize(VALUE self, VALUE pidv, VALUE fdv)
 
   Data_Get_Struct(self, pt_process_tail_t, ptp);
 
-  ptp->pid          = (pid_t)NUM2INT(pidv);
-  ptp->fd           = (unsigned int)NUM2INT(fdv);
-  ptp->proc         = rb_block_proc();
-  ptp->trace_thread = (VALUE)NULL;
-  ptp->wait_queue   = (VALUE)NULL;
-  ptp->tracee       = NULL;
+  ptp->pid           = (pid_t)NUM2INT(pidv);
+  ptp->fd            = (unsigned int)NUM2INT(fdv);
+  ptp->proc          = rb_block_proc();
+  ptp->trace_thread  = (VALUE)NULL;
+  ptp->parent_thread = (VALUE)NULL;
+  ptp->wait_queue    = (VALUE)NULL;
+  ptp->tracee        = NULL;
 
   return Qnil;
 }
@@ -84,6 +83,7 @@ pt_process_tail_trace_thread_reader(VALUE self)
 
 VALUE ProcessTail;
 VALUE ProcessTail_Tracer;
+VALUE ProcessTail_StopTracing;
 
 void
 pt_lock_trace(void)
@@ -100,9 +100,11 @@ pt_unlock_trace(void)
 void
 Init_process_tail(void)
 {
-  ProcessTail        = rb_define_module("ProcessTail");
-  ProcessTail_Tracer = rb_define_class_under(ProcessTail, "Tracer", rb_cObject);
+  ProcessTail = rb_define_module("ProcessTail");
 
+  ProcessTail_StopTracing = rb_define_class_under(ProcessTail, "StopTracing", rb_eStandardError);
+
+  ProcessTail_Tracer = rb_define_class_under(ProcessTail, "Tracer", rb_cObject);
   rb_define_const(ProcessTail_Tracer, "TRACE_LOCK", rb_class_new_instance(0, NULL, rb_path2class("Mutex")));
 
   rb_define_alloc_func(ProcessTail_Tracer, pt_process_tail_alloc);

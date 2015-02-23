@@ -191,6 +191,7 @@ pt_finalize(VALUE self)
   pt_tracee_free(&pt->tracee);
 
   pt_unlock_trace();
+  rb_funcall(pt->parent_thread, rb_intern("raise"), 1, ProcessTail_StopTracing);
 
   return Qnil;
 }
@@ -222,9 +223,10 @@ pt_ptrace_attach(VALUE self)
 
   Data_Get_Struct(self, pt_process_tail_t, pt);
 
-  pt->tracee       = pt_extract_tracee_list(pt->pid);
-  pt->wait_queue   = rb_class_new_instance(0, NULL, rb_path2class("Queue"));
-  pt->trace_thread = rb_thread_create(pt_loop_thread, (void *)self);
+  pt->tracee        = pt_extract_tracee_list(pt->pid);
+  pt->wait_queue    = rb_class_new_instance(0, NULL, rb_path2class("Queue"));
+  pt->parent_thread = rb_thread_current();
+  pt->trace_thread  = rb_thread_create(pt_loop_thread, (void *)self);
 
   wait_queue_ntimes(pt->wait_queue, pt_tracee_length(pt->tracee));
 

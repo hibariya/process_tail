@@ -34,6 +34,8 @@ module ProcessTail
       trace_thread.kill.join
 
       self
+    rescue StopTracing
+      # NOP
     end
 
     private
@@ -65,6 +67,8 @@ module ProcessTail
       }
 
       block_given? ? yield(read_io) : read_io
+    rescue StopTracing
+      # NOP
     ensure
       if block_given?
         [read_io, write_io].each do |io|
