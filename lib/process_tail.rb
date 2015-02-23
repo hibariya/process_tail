@@ -30,12 +30,18 @@ module ProcessTail
       self
     end
 
-    def detach
-      trace_thread.kill.join
+    def wait
+      trace_thread.join
 
       self
     rescue StopTracing
       # NOP
+    end
+
+    def detach
+      trace_thread.kill if trace_thread.alive?
+
+      wait
     end
 
     private
@@ -48,6 +54,18 @@ module ProcessTail
   end
 
   class << self
+    def each(pid)
+      tracer = trace(pid, :all) {|tid, fd, str|
+        yield tid, fd, str
+      }
+
+      tracer.wait
+    rescue StopTracing
+      # NOP
+    ensure
+      tracer.detach
+    end
+
     def open(pid, fd = :stdout)
       read_io, write_io = IO.pipe
 

@@ -4,12 +4,6 @@ require 'process_tail'
 
 $stdout.sync = true
 
-ProcessTail.open Integer(ARGV[0]), :all do |io|
-  begin
-    while c = io.getc
-      print c
-    end
-  rescue IOError
-    # NOP
-  end
+ProcessTail.each Integer(ARGV[0]) do |tid, fd, str|
+  print str if fd == 1 || fd == 2
 end

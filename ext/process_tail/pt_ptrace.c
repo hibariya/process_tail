@@ -170,7 +170,7 @@ pt_loop(VALUE self)
 
       pt_read_data(pid, regs.rsi, string, regs.rdx);
 
-      rb_proc_call(pt->proc, rb_ary_new_from_args(3, INT2NUM((int)pid), INT2NUM(pt->fd), rb_str_new_cstr(string)));
+      rb_proc_call(pt->proc, rb_ary_new_from_args(3, INT2NUM((int)pid), INT2NUM(regs.rdi), rb_str_new_cstr(string)));
 
       free(string);
     }
