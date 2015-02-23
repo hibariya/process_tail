@@ -10,13 +10,13 @@ dtrace:::BEGIN
 }
 
 syscall:::entry
-/trackedpid[ppid] == -1 && 0 == self->child/
+/trackedpid[ppid] == -1 && self->child == 0/
 {
   self->child = 1;
 }
 
 syscall:::entry
-/trackedpid[ppid] > 0 && 0 == self->child/
+/trackedpid[ppid] > 0 && self->child == 0/
 {
   this->vforking_tid = trackedpid[ppid];
   self->child        = (this->vforking_tid == tid) ? 0 : 1;
@@ -29,15 +29,6 @@ syscall:::entry
   self->arg0  = arg0;
   self->arg1  = arg1;
   self->arg2  = arg2;
-}
-
-syscall:::entry
-/!((probefunc == "write" || probefunc == "write_nocancel") && (FD == 0 || self->arg0 == FD))/
-{
-  self->start = 0;
-  self->arg0  = 0;
-  self->arg1  = 0;
-  self->arg2  = 0;
 }
 
 syscall::fork:entry
@@ -56,6 +47,21 @@ syscall::exit:entry
 {
  self->child     = 0;
  trackedpid[pid] = 0;
+}
+
+syscall::exit:entry
+/pid == PID/
+{
+  exit(0);
+}
+
+syscall:::entry
+/!((probefunc == "write" || probefunc == "write_nocancel") && (FD == 0 || self->arg0 == FD))/
+{
+  self->start = 0;
+  self->arg0  = 0;
+  self->arg1  = 0;
+  self->arg2  = 0;
 }
 
 syscall::write:return,
