@@ -13,6 +13,7 @@ probe_consumer(const dtrace_probedata_t *data, void *argp)
   dtrace_eprobedesc_t *edesc = data->dtpda_edesc;
   dtrace_recdesc_t *rec;
   caddr_t addr;
+
   int i;
   VALUE arg;
   VALUE args = rb_ary_new_capa(3);
@@ -30,19 +31,19 @@ probe_consumer(const dtrace_probedata_t *data, void *argp)
       case DTRACEACT_DIFEXPR:
         switch(rec->dtrd_size) {
           case 1:
-            arg = INT2FIX((int)(*((uint8_t *)addr)));
+            arg = INT2NUM((int)(*((uint8_t *)addr)));
             break;
           case 2:
-            arg = INT2FIX((int)(*((uint16_t *)addr)));
+            arg = INT2NUM((int)(*((uint16_t *)addr)));
             break;
           case 4:
-            arg = INT2FIX(*((int32_t *)addr));
+            arg = INT2NUM(*((int32_t *)addr));
             break;
           case 8:
             arg = LL2NUM(*((int64_t *)addr));
             break;
           default:
-            arg = (rb_str_new2((char *)addr));
+            arg = rb_str_new_cstr((char *)addr);
         }
 
         rb_ary_push(args, arg);
@@ -88,6 +89,7 @@ pt_loop(VALUE self)
 
   dtrace_setopt(hdl, "stacksymbols", "enabled");
   dtrace_setopt(hdl, "bufsize", "4m");
+  dtrace_setopt(hdl, "quiet", 0);
 
   program = dtrace_program_strcompile(hdl, StringValueCStr(dscriptv), DTRACE_PROBESPEC_NAME, DTRACE_C_PSPEC, 0, NULL);
 
