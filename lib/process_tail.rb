@@ -4,7 +4,7 @@ require 'erb'
 require 'thread'
 
 module ProcessTail
-  module ReadIOExtention
+  module ReadIOExtension
     attr_accessor :process_tail_after_close
 
     def close
@@ -78,7 +78,7 @@ module ProcessTail
         end
       }
 
-      read_io.extend ReadIOExtention
+      read_io.extend ReadIOExtension
       read_io.process_tail_after_close = -> {
         write_io.close unless write_io.closed?
         tracer.detach
