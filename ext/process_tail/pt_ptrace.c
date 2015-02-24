@@ -112,7 +112,7 @@ pt_loop(VALUE self)
   Data_Get_Struct(self, pt_process_tail_t, pt);
 
   if (!pt_ptrace_attach_multi(pt->tracee)) {
-    rb_raise(rb_eRuntimeError, "PTRACE_ATTACH");
+    rb_raise(ProcessTail_TraceError, "PTRACE_ATTACH");
 
     return Qnil;
   }

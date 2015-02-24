@@ -92,17 +92,17 @@ pt_loop(VALUE self)
   program = dtrace_program_strcompile(hdl, StringValueCStr(dscriptv), DTRACE_PROBESPEC_NAME, DTRACE_C_PSPEC, 0, NULL);
 
   if (!program) {
-    rb_raise(rb_eRuntimeError, "dtrace_program_strcompile: %s", dtrace_errmsg(hdl, dtrace_errno(hdl)));
+    rb_raise(ProcessTail_TraceError, "dtrace_program_strcompile: %s", dtrace_errmsg(hdl, dtrace_errno(hdl)));
     return Qnil;
   }
 
   if (dtrace_program_exec(hdl, program, proginfo) < 0) {
-    rb_raise(rb_eRuntimeError, "dtrace_program_exec: %s", dtrace_errmsg(hdl, dtrace_errno(hdl)));
+    rb_raise(ProcessTail_TraceError, "dtrace_program_exec: %s", dtrace_errmsg(hdl, dtrace_errno(hdl)));
     return Qnil;
   }
 
   if (dtrace_go(hdl) < 0) {
-    rb_raise(rb_eRuntimeError, "dtrace_go: %s", dtrace_errmsg(hdl, dtrace_errno(hdl)));
+    rb_raise(ProcessTail_TraceError, "dtrace_go: %s", dtrace_errmsg(hdl, dtrace_errno(hdl)));
     return Qnil;
   }
 
@@ -119,7 +119,7 @@ pt_loop(VALUE self)
 
     if (done) {
       if(dtrace_stop(hdl) == -1) {
-        rb_raise(rb_eRuntimeError, "dtrace_stop: %s", dtrace_errmsg(hdl, dtrace_errno(hdl)));
+        rb_raise(ProcessTail_TraceError, "dtrace_stop: %s", dtrace_errmsg(hdl, dtrace_errno(hdl)));
         return Qnil;
       }
     }
@@ -176,7 +176,7 @@ pt_dtrace_attach(VALUE self)
   Data_Get_Struct(self, pt_process_tail_t, pt);
 
   if (!hdl) {
-    rb_raise(rb_eRuntimeError, "dtrace_open: %s", strerror(error));
+    rb_raise(ProcessTail_TraceError, "dtrace_open: %s", strerror(error));
     return Qnil;
   }
 

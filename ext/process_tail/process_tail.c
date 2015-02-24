@@ -84,6 +84,7 @@ pt_process_tail_trace_thread_reader(VALUE self)
 VALUE ProcessTail;
 VALUE ProcessTail_Tracer;
 VALUE ProcessTail_StopTracing;
+VALUE ProcessTail_TraceError;
 
 void
 pt_lock_trace(void)
@@ -103,6 +104,7 @@ Init_process_tail(void)
   ProcessTail = rb_define_module("ProcessTail");
 
   ProcessTail_StopTracing = rb_define_class_under(ProcessTail, "StopTracing", rb_eStandardError);
+  ProcessTail_TraceError  = rb_define_class_under(ProcessTail, "TraceError",  rb_eStandardError);
 
   ProcessTail_Tracer = rb_define_class_under(ProcessTail, "Tracer", rb_cObject);
   rb_define_const(ProcessTail_Tracer, "TRACE_LOCK", rb_class_new_instance(0, NULL, rb_path2class("Mutex")));

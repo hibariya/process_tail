@@ -10,6 +10,7 @@
 extern VALUE ProcessTail;
 extern VALUE ProcessTail_Tracer;
 extern VALUE ProcessTail_StopTracing;
+extern VALUE ProcessTail_TraceError;
 
 typedef struct {
   pid_t pid;
