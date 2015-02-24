@@ -13,3 +13,5 @@
 *.a
 mkmf.log
 Vagrantfile
+Makefile
+extconf.h

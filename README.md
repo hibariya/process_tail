@@ -5,12 +5,12 @@ https://github.com/hibariya/process_tail
 ## Description
 
 ProcessTail traces other process' write(2) system call and copy its buffer.
-So you can get other process outputs.
+So we can get other process outputs.
 
 ## Problems
 
-* Mac OSX and Windows are not supported at the moment
-* SEGV occures occasionally
+* SEGV occurs infrequently
+* Windows is not supported
 
 ## Installation
 
@@ -30,11 +30,15 @@ Or install it yourself as:
 
 ## Usage
 
+On Mac OSX, you'll have to use `sudo`.
+
 ### Get outputs as an IO object
 
 ```ruby
-ProcessTail.open pid, :stdout do |io|
-  puts "Recent stdout of #{pid}: #{io.gets}"
+ProcessTail.each pid do |tid, fd, str|
+  puts tid # pid or tid of this process (thread)
+  puts fd  # File descripter number
+  puts str # Output string
 end
 ```
 
