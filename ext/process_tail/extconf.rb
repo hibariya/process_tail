@@ -1,16 +1,13 @@
 require 'mkmf'
 
-%w(string.h ruby.h ruby/thread.h).each do |h|
-  abort "missing #{h}" unless have_header(h)
-end
-
-availables = []
+objs = []
 
 -> {
   return unless have_library('dtrace', 'dtrace_open', 'dtrace.h')
-  return unless have_header('dtrace.h')
 
-  availables << 'pt_dtrace.o'
+  have_header 'dtrace.h'
+
+  objs << 'pt_dtrace.o'
 }.()
 
 -> {
@@ -26,14 +23,16 @@ availables = []
 
   return unless %w(PTRACE_O_TRACESYSGOOD PTRACE_O_TRACEFORK PTRACE_O_TRACEVFORK PTRACE_O_TRACECLONE).all? {|c|
     have_const(c, 'sys/ptrace.h')
-  } && have_header('sys/ptrace.h')
+  }
 
-  availables << 'pt_ptrace.o'
+  have_header 'sys/ptrace.h'
+
+  objs << 'pt_ptrace.o'
 }.()
 
-abort 'No available libraries' if availables.empty?
+abort 'No available libraries' if objs.empty?
 
-$objs = %w(process_tail.o pt_tracee.o) + availables
+$objs = %w(process_tail.o pt_tracee.o) + objs
 
 create_header
 create_makefile 'process_tail/process_tail'
